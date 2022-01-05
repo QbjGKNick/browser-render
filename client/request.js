@@ -4,9 +4,8 @@ const main = require('./main')
 const network = require('./network')
 const render = require('./render')
 const gpu = require('./gpu')
-const { dir } = require('console')
 const host = 'localhost'
-const port = 80
+const port = 8002
 // 浏览器主进程接收请求，会把请求转发给网络进程
 main.on('request', function(options) {
   // 会把请求转发给网络进程
@@ -34,7 +33,7 @@ network.on('request', (options) => {
 render.on('commitNavigation', (response) => {
   const headers = response.headers
   // 获取 响应体的类型 渲染进程
-  const contentType = headers['Content-Type']
+  const contentType = headers['Content-Type'] || headers['content-type']
   // 说明这是一个HTML响应
   if (contentType.indexOf('text/html') !== -1) {
     const document = {
@@ -88,27 +87,28 @@ render.on('commitNavigation', (response) => {
       parser.write(buffer.toString())
     })
     response.on('end', () => {
-      // const resultBuffer = Buffer.concat(buffers) // 二进制缓冲区
-      // const html = resultBuffer.toString() // 转成HTML字符串
-      console.log('html', html);
-      // 计算每个DOM节点的具体样式 继承 层叠
-      recalculateStyle(cssRules, document)
-      // 创建一个只包含可见元素的布局树
-      const html = document.children[0]
-      const body = html.children[1]
-      const layoutTree = createLayoutTree(body)
-      // 更新布局树，计算每个元素布局信息
-      updateLayoutTree(layoutTree)
-      console.dir(layoutTree, { depth: null })
-      // 根据布局树生成分层树
-      const layers = [layoutTree]
-      createLayerTree(layoutTree, layers)
-      // 根据分层树生成绘制步骤， 并复合图层
-      const paintSteps = compositeLayers(layers)
-      console.log(paintSteps.flat().join('\r\n'))
-      // 先切成一个个小的图块
-      const tiles = splitTiles(paintSteps)
-      raster(tiles)
+      // // const resultBuffer = Buffer.concat(buffers) // 二进制缓冲区
+      // // const html = resultBuffer.toString() // 转成HTML字符串
+      // console.log('html', html);
+      // // 计算每个DOM节点的具体样式 继承 层叠
+      // recalculateStyle(cssRules, document)
+      // // 创建一个只包含可见元素的布局树
+      // const html = document.children[0]
+      // const body = html.children[1]
+      // const layoutTree = createLayoutTree(body)
+      // // 更新布局树，计算每个元素布局信息
+      // updateLayoutTree(layoutTree)
+      // console.dir(layoutTree, { depth: null })
+      // // 根据布局树生成分层树
+      // const layers = [layoutTree]
+      // createLayerTree(layoutTree, layers)
+      // // 根据分层树生成绘制步骤， 并复合图层
+      // const paintSteps = compositeLayers(layers)
+      // console.log(paintSteps.flat().join('\r\n'))
+      // // 先切成一个个小的图块
+      // const tiles = splitTiles(paintSteps)
+      // raster(tiles)
+      console.dir(document, { depth: null })
       // DOM 解析完毕
       main.emit('DOMContentLoaded')
       // CSS和图片加载完成后
