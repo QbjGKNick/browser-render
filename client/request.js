@@ -1,5 +1,5 @@
 const http = require('http')
-const htmlparse2 = require('htmlparser2')
+const htmlparser2 = require('htmlparser2')
 const main = require('./main')
 const network = require('./network')
 const render = require('./render')
@@ -14,19 +14,20 @@ main.on('request', function(options) {
 })
 
 // 主进程 接收到消息后要通知渲染进程进行开始渲染
-main.on('prepareRender', function (options) {
+main.on('prepareRender', function (response) {
   // 主进程发送提交导航的消息给渲染进程
-  render.emit('commitNavigation')
+  render.emit('commitNavigation', response)
 })
 
 // ****************网络进程*******************************
 network.on('request', (options) => {
   // 调用http模块发送请求给服务
-  let request = http.request(options, () => {
+  let request = http.request(options, (response) => {
     let headers = response.headers
     // 告诉主进程请开始渲染页面
     main.emit('prepareRender', response)
   })
+  request.end()
 })
 
 // ******************渲染进程******************
@@ -43,7 +44,7 @@ render.on('commitNavigation', (response) => {
     }
     const tokenStack = [document]
     // 1. 通过渲染进程把html 字符串 转成 DOM树
-    const parser = new htmlparse2.Parser({
+    const parser = new htmlparser2.Parser({
       onopentag(tagName, attributes) { // 遇到开始标签
         // 栈顶的就是父节点
         const parent = tokenStack[tokenStack.length - 1]
@@ -81,41 +82,39 @@ render.on('commitNavigation', (response) => {
         tokenStack.pop()
       }
     })
-  }
 
-  const buffers = []
-  // 一旦接收到部分响应体，直接传递给htmlparser
-  // 持续接收响应体
-  response.on('data', (buffer) => {
-    buffers.push(buffer)
-  })
-  response.on('end', () => {
-    // const resultBuffer = Buffer.concat(buffers) // 二进制缓冲区
-    // const html = resultBuffer.toString() // 转成HTML字符串
-    console.log('html', html);
-    // 计算每个DOM节点的具体样式 继承 层叠
-    recalculateStyle(cssRules, document)
-    // 创建一个只包含可见元素的布局树
-    const html = document.children[0]
-    const body = html.children[1]
-    const layoutTree = createLayoutTree(body)
-    // 更新布局树，计算每个元素布局信息
-    updateLayoutTree(layoutTree)
-    console.dir(layoutTree, { depth: null })
-    // 根据布局树生成分层树
-    const layers = [layoutTree]
-    createLayerTree(layoutTree, layers)
-    // 根据分层树生成绘制步骤， 并复合图层
-    const paintSteps = compositeLayers(layers)
-    console.log(paintSteps.flat().join('\r\n'))
-    // 先切成一个个小的图块
-    const tiles = splitTiles(paintSteps)
-    raster(tiles)
-    // DOM 解析完毕
-    main.emit('DOMContentLoaded')
-    // CSS和图片加载完成后
-    main.emit('Loaded')
-  })
+    // 一旦接收到部分响应体，直接传递给htmlparser
+    response.on('data', (buffer) => {
+      parser.write(buffer.toString())
+    })
+    response.on('end', () => {
+      // const resultBuffer = Buffer.concat(buffers) // 二进制缓冲区
+      // const html = resultBuffer.toString() // 转成HTML字符串
+      console.log('html', html);
+      // 计算每个DOM节点的具体样式 继承 层叠
+      recalculateStyle(cssRules, document)
+      // 创建一个只包含可见元素的布局树
+      const html = document.children[0]
+      const body = html.children[1]
+      const layoutTree = createLayoutTree(body)
+      // 更新布局树，计算每个元素布局信息
+      updateLayoutTree(layoutTree)
+      console.dir(layoutTree, { depth: null })
+      // 根据布局树生成分层树
+      const layers = [layoutTree]
+      createLayerTree(layoutTree, layers)
+      // 根据分层树生成绘制步骤， 并复合图层
+      const paintSteps = compositeLayers(layers)
+      console.log(paintSteps.flat().join('\r\n'))
+      // 先切成一个个小的图块
+      const tiles = splitTiles(paintSteps)
+      raster(tiles)
+      // DOM 解析完毕
+      main.emit('DOMContentLoaded')
+      // CSS和图片加载完成后
+      main.emit('Loaded')
+    })
+  }
 })
 
 // 切分图块
