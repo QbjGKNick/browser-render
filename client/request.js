@@ -1,9 +1,11 @@
 const http = require('http')
 const htmlparser2 = require('htmlparser2')
+const css = require('css')
 const main = require('./main')
 const network = require('./network')
 const render = require('./render')
 const gpu = require('./gpu')
+const { dir } = require('console')
 const host = 'localhost'
 const port = 8002
 // 浏览器主进程接收请求，会把请求转发给网络进程
@@ -42,6 +44,7 @@ render.on('commitNavigation', (response) => {
       children: []
     }
     const tokenStack = [document]
+    const cssRules = []
     // 1. 通过渲染进程把html 字符串 转成 DOM树
     const parser = new htmlparser2.Parser({
       onopentag(tagName, attributes) { // 遇到开始标签
@@ -58,16 +61,18 @@ render.on('commitNavigation', (response) => {
         tokenStack.push(child)
       },
       ontext(text) {
-        // 文本节点不需要入栈
-        const parent = tokenStack[tokenStack.length - 1]
-        const child = {
-          type: 'text',
-          tagName: 'text', // html
-          children: [],
-          text,
-          attributes: {}
+        if (!/^[\r\n]*$/.test(text)) {
+          // 文本节点不需要入栈
+          const parent = tokenStack[tokenStack.length - 1]
+          const child = {
+            type: 'text',
+            tagName: 'text', // html
+            children: [],
+            text,
+            attributes: {}
+          }
+          parent.children.push(child)
         }
-        parent.children.push(child)
       },
       onclosetag(tagName) {
         switch(tagName) {
@@ -75,7 +80,7 @@ render.on('commitNavigation', (response) => {
             const styleToken = tokenStack[tokenStack.length - 1];
             const cssAST = css.parse(styleToken.children[0].text)
             const rules = cssAST.stylesheet.rules
-            CSSRules
+            cssRules.push(...rules)
         }
         // 栈顶元素出栈
         tokenStack.pop()
@@ -90,15 +95,14 @@ render.on('commitNavigation', (response) => {
       // // const resultBuffer = Buffer.concat(buffers) // 二进制缓冲区
       // // const html = resultBuffer.toString() // 转成HTML字符串
       // console.log('html', html);
-      // // 计算每个DOM节点的具体样式 继承 层叠
-      // recalculateStyle(cssRules, document)
-      // // 创建一个只包含可见元素的布局树
-      // const html = document.children[0]
-      // const body = html.children[1]
-      // const layoutTree = createLayoutTree(body)
-      // // 更新布局树，计算每个元素布局信息
-      // updateLayoutTree(layoutTree)
-      // console.dir(layoutTree, { depth: null })
+      // 计算每个DOM节点的具体样式 继承 层叠
+      recalculateStyle(cssRules, document)
+      // 创建一个只包含可见元素的布局树
+      const html = document.children[0]
+      const body = html.children[1]
+      const layoutTree = createLayoutTree(body)
+      // 更新布局树，计算每个元素布局信息
+      updateLayoutTree(layoutTree)
       // // 根据布局树生成分层树
       // const layers = [layoutTree]
       // createLayerTree(layoutTree, layers)
@@ -108,7 +112,7 @@ render.on('commitNavigation', (response) => {
       // // 先切成一个个小的图块
       // const tiles = splitTiles(paintSteps)
       // raster(tiles)
-      console.dir(document, { depth: null })
+      console.dir(layoutTree, { depth: null })
       // DOM 解析完毕
       main.emit('DOMContentLoaded')
       // CSS和图片加载完成后
@@ -211,14 +215,24 @@ function isShow(element) {
   }
   const attributes = element.attributes
   Object.entries(attributes).forEach(([key, value]) => {
-
+    if (key === 'style') {
+      const attributes = value.split(/;\s*/)
+      attributes.forEach(attribute => {
+        const [property, value] = attribute.split(/;\s*/)
+        // property && (element.computedStyle[property] = value)
+        if (property === 'display' && value === 'none') {
+          show = false
+        }
+      })
+    }
   })
+  return show
 }
 
 function recalculateStyle(cssRules, element, parentStyle = {}) {
   const attributes = element.attributes
-  element.computedStyle = { // 样式集成
-    color: parentStyle.color
+  element.computedStyle = { // 样式继承
+    color: parentStyle.color || 'black'
   }
   Object.entries(attributes).forEach(([key, value]) => {
     // 应用样式表
@@ -232,7 +246,7 @@ function recalculateStyle(cssRules, element, parentStyle = {}) {
     })
     // 行内样式
     if (key === 'style') {
-      const attributes = value.split(';') // background: green
+      const attributes = value.split(/;\s*/) // background: green
       attributes.forEach(attribute => { // background: green
         const [property, value] = attribute.split('\s*:\s*') // ['background', 'green']
         property && (element.computedStyle[property] = value)
@@ -241,7 +255,7 @@ function recalculateStyle(cssRules, element, parentStyle = {}) {
   })
   element.children.forEach(child => recalculateStyle(cssRules, child, element.computedStyle))
 }
-//GPU进程负责把图片光珊瑚，生成位图并保存到GPU内存里
+//GPU进程负责把图片光栅化，生成位图并保存到GPU内存里
 gpu.on('raster', tile => {
 
 })

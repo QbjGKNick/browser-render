@@ -7,13 +7,6 @@ const doc = {
       tagName: 'html',
       children: [
         {
-          type: 'text',
-          tagName: 'text',
-          children: [],
-          text: '\n',
-          attributes: {}
-        },
-        {
           type: 'element',
           tagName: 'body',
           children: [
@@ -21,7 +14,7 @@ const doc = {
               type: 'text',
               tagName: 'text',
               children: [],
-              text: '\n  ',
+              text: '\r\n  ',
               attributes: {}
             },
             {
@@ -36,13 +29,13 @@ const doc = {
                   attributes: {}
                 }
               ],
-              attributes: { id: 'hello', style: 'background: green;' }
+              attributes: {}
             },
             {
               type: 'text',
               tagName: 'text',
               children: [],
-              text: '\n  ',
+              text: '\r\n  ',
               attributes: {}
             },
             {
@@ -57,23 +50,9 @@ const doc = {
                   attributes: {}
                 }
               ],
-              attributes: { class: 'world', style: 'background: red;' }
-            },
-            {
-              type: 'text',
-              tagName: 'text',
-              children: [],
-              text: '\n',
               attributes: {}
             }
           ],
-          attributes: {}
-        },
-        {
-          type: 'text',
-          tagName: 'text',
-          children: [],
-          text: '\n',
           attributes: {}
         }
       ],

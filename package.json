@@ -10,6 +10,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "css": "^3.0.0",
     "express": "^4.17.2",
     "htmlparser2": "^7.2.0"
   }
